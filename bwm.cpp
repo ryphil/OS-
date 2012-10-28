@@ -10,14 +10,26 @@ int wm(string, string);
 
 int main(int argc, char* argv[])
 {  
-	string imagePath = argv[argc-2];
-	string wmPath = argv[argc-1];
+	pid_t wgetPID;
+	int status;
+
+	//Create the temp directory that is going to be used for temp files
 	system("mkdir temp");
 	//loop(./temp,);
 
-	cout << imagePath << " " << wmPath << endl;
+	wgetPID = fork();
+	if (wgetPID == 0) {
+		//Need to change this depending on what time of image or folder, need if statement
+		//to see if we have a directory and if its just an image we just need to use the same
+		//switch statement from project 2.
+		execl ("/usr/bin/wget", "wget", "-O", "./temp/image.jpg", argv[argc-2], (char*)0); 
+	}
+	else {
+		wait(&status);
+	}
 
-	wm (imagePath, wmPath);
+	//Call wm for a single image
+	wm (argv[argc-2], argv[argc-1]);
 	//system ("rmdir temp");
 }
 /**
