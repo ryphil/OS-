@@ -18,7 +18,7 @@ int main(int argc, char* argv[])
 	cout << imagePath << " " << wmPath << endl;
 
 	wm (imagePath, wmPath);
-	system ("rmdir temp");
+	//system ("rmdir temp");
 }
 /**
 int loop(DIR dir, int max, int current, String watermark){
