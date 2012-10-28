@@ -102,9 +102,9 @@ int main(int argc, char* argv[])
 						if ( imageType == 1 ){ 							
 							execl("/usr/bin/firefox",browser,"accounts.cs.ou.edu/~phil7017/jpg_image.jpg",(char*)0);
 						} else if ( imageType == 2 ) {
-							execl("/usr/bin/firefox", browser,"accounts.cs.ou.edu/~phil7017/png_image.png",(char*)0);
+							execl("/usr/bin/firefox",browser,"accounts.cs.ou.edu/~phil7017/png_image.png",(char*)0);
 						} else {
-							execl("usr/bin/firefox", browser,"accounts.cs.ou.edu/~phil7017/tif_image.tif",(char*)0);
+							execl("/usr/bin/firefox",browser,"accounts.cs.ou.edu/~phil7017/tif_image.tif",(char*)0);
 						}
 					}
 					
