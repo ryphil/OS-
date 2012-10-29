@@ -7,7 +7,7 @@
 using namespace std;
 
 int wm(string, string);
-
+int loop(string,int,int,string);
 int main(int argc, char* argv[])
 {  
 	pid_t wgetPID;
@@ -22,28 +22,43 @@ int main(int argc, char* argv[])
 		//Need to change this depending on what time of image or folder, need if statement
 		//to see if we have a directory and if its just an image we just need to use the same
 		//switch statement from project 2.
-		execl ("/usr/bin/wget", "wget", "-O", "./temp/image.jpg", argv[argc-2], (char*)0); 
+
+		//use -r and -l # to recursivly download to a certain depth.
+		execl ("/usr/bin/wget", "wget","-r","-l","2", "-P","./temp/","-A", "jpg,tif,png", argv[argc-2], (char*)0); 
 	}
 	else {
 		wait(&status);
 	}
-
+	
+	string name = "./temp";
+	string watermark = "/watermark";
+	loop(name,3,0,watermark);
 	//Call wm for a single image
 	wm (argv[argc-2], argv[argc-1]);
 	//system ("rmdir temp");
 }
-/**
-int loop(DIR dir, int max, int current, String watermark){
-	
-	while(loop through dir){
-		if(is dir && current + 1 < max){
-			loop(dir name,max,current++,watermark);
-		}else if(is image){
-			watermark(image,watermark);
+
+int loop(string name, int max, int current, string watermark){
+
+	DIR* dir;
+	dir = opendir(name.c_str());
+	struct dirent* ent;
+	if(dir != NULL){
+		while((ent = readdir(dir)) != NULL){
+			DIR* cur = opendir(ent->d_name);
+			if(cur != NULL && current + 1 < max){
+				cout << "directory:" << ent->d_name << endl;
+				current++;
+				loop(ent->d_name,max,current++,watermark);
+			}else{
+				//watermark(ent->d_name,watermark);
+				cout<< "image:" << ent->d_name << endl;
+			}
 		}
 	}
+	return 0;
 
-}**/
+}
 
 int wm( string file,  string watermark){
 	
