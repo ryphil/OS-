@@ -16,7 +16,7 @@ int main(int argc, char* argv[])
 	//Create the temp directory that is going to be used for temp files
 	pid_t mkdirPID = fork();
 	if (mkdirPID == 0) {
-		execl ("/bin/mkdir", "mkdir", "temp", (char*)0);
+		execl ("/bin/mkdir", "mkdir", "temp",  (char*)0);
 	} else {
 		wait (&status);
 	}
@@ -24,37 +24,37 @@ int main(int argc, char* argv[])
 	//Loop through the arguments and see if -r or --recursive=NUM was specefied,
 	//otherwise
 	bool recursive = false;
-	string rnum, str2;
+	bool save = false;
+	string rnum, str;
 	string URL = argv[argc-2];
-	
-	//If the URL is a directory, then see if -r or --recursive=NUM was specefied
-	if (URL.at(URL.length()-1) == '/') {
-		
-		for ( int i = 1; i < argc-1; i++) {
-			str2 = argv[i];
-			//check to see if -r is called
-			if (str2.at(1) == 'r' ) {
-				recursive=true;
-				rnum = argv[i+1];
-				break;
-			//check to see if --recursive is called, then set rnum to whatever is after the =
-			} else if (str2.at(2) == 'r') {
+	for ( int i = 1; i < argc-1; i++) {
+		str = argv[i];
+		cout << str << endl;
+
+		if (str.length() > 2) {
+			if (str.at(2) == 's' && str.length() > 2) {
+				save=true;
+			}
+			if (str.at(2) == 'r') {
 				recursive =true;
 				rnum=argv[i];
 				rnum = rnum.substr(12, rnum.length()-1);
-				break;
 			}
-		}
-	} else if (recursive) {
-		//Need to exit because the user tried to call -r or --recursive=NUM on 
-		// a single image.
-		cout << "bwm will now exit because -r or --recursive=NUM was specefied without specifying a directory" << endl;
-		exit(0);
+		}	
+		//check to see if -r is called
+		if (str.at(1) == 'r' ) {
+			recursive=true;
+			rnum = argv[i+1];
+			i++;
+		//check to see if --recursive is called, then set rnum to whatever is after the =
+		}  
+		if (str.at(1) == 's' ) {
+			save=true;
+		}	
+		
 	}
-	
-
-	//If -s or --save was not specefied, remove the directory
-	if (recursive) {
+	//If the URL is a directory, then see if -r or --recursive=NUM was specefied
+	if (URL.at(URL.length()-1) == '/') {
 		wgetPID = fork();
 		if (wgetPID == 0) {
 		//Need to change this depending on what time of image or folder, need if statement
@@ -67,9 +67,13 @@ int main(int argc, char* argv[])
 		else {
 			wait(&status);
 		}
+		
+	} else if (recursive) {
+		//Need to exit because the user tried to call -r or --recursive=NUM on 
+		// a single image.
+		cout << "bwm will now exit because -r or --recursive=NUM was specefied without specifying a directory" << endl;
+		exit(0);
 	} else {
-		//Need to do something if the recursive call is not called, need to also exit if the -r is
-		//called for a single image. 
 		switch (URL.at(URL.length()-2) ) {
 		case 'p': 
 			cout << "***Image is a jpg" << endl;
@@ -85,6 +89,26 @@ int main(int argc, char* argv[])
 			break;
  		}
 	}
+
+	//If -s or --save was specefied, copy the directory so that we save the 
+	if (save) {
+
+		pid_t mkdirOriginalPID = fork();
+		if (mkdirOriginalPID == 0) {
+			execl ("/bin/mkdir", "mkdir", "Original", (char*)0);
+		} else {
+			wait (&status);
+		}
+		pid_t rmdirPID = fork();
+		if (rmdirPID == 0) {	
+			cout << "Copy Originals because -s or --save was specefied." << endl;
+			execl("/bin/","cp","-r","./temp", "./Original",(char*)0);
+		}
+		else {
+			wait(&status);
+		}
+	}
+	
 	
 	//loop(./temp,);
 	string name = "./temp";
@@ -93,28 +117,24 @@ int main(int argc, char* argv[])
 	//Call wm for a single image
 	wm (argv[argc-2], argv[argc-1]);
 
-	//Loop through the arguments and see if -s or --save was specefied
-	//if so, make sure we save the original file.
-	bool save = false;
-	string str;
-	for ( int i = 1; i < argc-1; i++) {
-		str = argv[i];
-		if (str.at(1) == 's' || str.at(2) == 's') {
-			save=true;
-		}	
-	}
+	
 
-	//If -s or --save was not specefied, remove the directory
-	if (!save) {
-		pid_t rmdirPID = fork();
-		if (rmdirPID == 0) {	
-			cout << "remove the directory" << endl;
-			execl("/bin/rm","rm","-r","temp",(char*)0);
+	pid_t rmtemp = fork();
+	if (rmtemp == 0) {
+		if ( save ) {
+			cout << "Remove temp files, but save Originals." << endl;
+			execl ("/bin/rm", "rm", "-r", "temp",(char*)0);
 		}
 		else {
-			wait(&status);
+			cout << "Remove all temp files." << endl;
+			execl ("/bin/rm","rm","-r", "temp","Original",(char*)0);
 		}
 	}
+	else {
+		wait(&status);
+	}
+
+	
 }
 /**
 int loop(string name, int max, int current, string watermark){
@@ -144,32 +164,12 @@ int wm( string file,  string watermark){
 string filePath = file;
 string wmPath = watermark;
 
-cout << filePath << " " << wmPath << endl;
 /*Create child pid_t so we can wait fork off children and wait on them to finish*/
     pid_t childpid2;
-    pid_t childpid3;
-    pid_t childpid4;
     int status;     /* parent process: child's exit status */
     //use this to set the type of image, (1=jpg, 2=png, 3=tif) for saving
     //the image as well as when viewing the final image on the web.
-    int imageType; 
-    string imageURL = file; 
-    switch (imageURL[imageURL.size() - 2]) {
-	case'i':  {
-		imageType = 3;
-		break;
-        }
-	case'p': {
-		
-		imageType = 1;
-		break;
-        }
-	case'n': {
-		imageType = 2;
-		break;
-	}
-    }
-
+    
     childpid2 = fork();		/* Create new child to apply watermark*/
     if ( childpid2 >= 0 )
     {
@@ -177,76 +177,13 @@ cout << filePath << " " << wmPath << endl;
 	 { 
 		//call the exec in child2 to apply the watermark on the image.
 		cout << "CHILD2: Begin Apply Watermark." << endl;
-  
-	if ( imageType == 1) {
-	    	int err = execl ("/usr/bin/composite", "composite", "-compose","bumpmap", "-tile", wmPath.c_str(),filePath.c_str(), "./temp/jpg_image.jpg", (char*)0);
-      		cout << err << endl;
-    	} else if (imageType == 2 ) {
-		int err = execl ("/usr/bin/composite", "composite", "-compose","bumpmap", "-tile",wmPath.c_str(),filePath.c_str(), "./temp/png_image.png", (char*)0);
-       		cout << err << endl;
-	} else {
-		int err = execl ("/usr/bin/composite", "composite", "-compose","bumpmap", "-tile",wmPath.c_str(),filePath.c_str(), "./temp/tif_image.tif", (char*)0);
-       		cout << err << endl;
- 	}
-		cout << "CHILD2: Watermark Failed." << endl;
+		
+  		execl ("/usr/bin/composite", "composite", "-compose","bumpmap", "-tile", wmPath.c_str(),filePath.c_str(), wmPath.c_str(), (char*)0);
 	}
 	else {
 		//wait for child2 to finish applying the watermark.
 		wait (&status);
 
-		//Create the 3rd child to upload the image.	
-		childpid3 = fork();		
-   		if ( childpid3 >= 0 )
-  		{
-		    if ( childpid3 == 0 )
-	 	    { 
-			//In the child Process, we must exec a new process to
-			//upload the image to the server.
-			cout << "CHILD3: Begin upload." << endl;
-		
-			if ( imageType == 1) {
-				execl ("/usr/bin/sftp", "sftp","-o", "batchmode no", "-b", "jpg.bat", "phil7017@gpel1.cs.ou.edu", (char*)0);
-
-    			} else if (imageType == 2 ) {
-				execl ("/usr/bin/sftp", "sftp","-o", "batchmode no", "-b", "png.bat", "phil7017@gpel1.cs.ou.edu", (char*)0);
-			} else {
-				execl ("/usr/bin/sftp", "sftp","-o", "batchmode no", "-b", "tif.bat", "phil7017@gpel1.cs.ou.edu", (char*)0);
-
-			}
-			//execl ("/usr/bin/sftp", "sftp","-o", "batchmode no", "-b", "jpg.bat", "phil7017@gpel1.cs.ou.edu", (char*)0);
-			cout << "CHILD3: Exec failed." << endl;
-		    }	
-	  	    else {
-			//wait for the child to finish uploading
-			wait (&status);
-			childpid4 = fork();
-			if ( childpid4 >= 0 )
-			{
-				if ( childpid4 == 0 ) {
-					//Launch browser here
-					cout << "CHILD4: child 4 launches web browser." << endl;
-					char* browser = getenv("BROWSER");	
-					cout << browser << endl;
-					if(browser == NULL){
-						cout<< "BROWSER not set, will launch Firefox." << endl;
-						exit(3);
-					} else{
-						if ( imageType == 1 ){ 							
-							execl("/usr/bin/firefox",browser,"accounts.cs.ou.edu/~phil7017/jpg_image.jpg",(char*)0);
-						} else if ( imageType == 2 ) {
-							execl("/usr/bin/firefox",browser,"accounts.cs.ou.edu/~phil7017/png_image.png",(char*)0);
-						} else {
-							execl("/usr/bin/firefox",browser,"accounts.cs.ou.edu/~phil7017/tif_image.tif",(char*)0);
-						}
-					}
-					
-				}
-				else {
-					wait (&status);
-				}
-			  }
-		     }
-		}	
    	  }	
     }     
         
