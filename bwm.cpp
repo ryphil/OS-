@@ -31,8 +31,8 @@ int main(int argc, char* argv[])
 	string URL = argv[argc-2];
 	for ( int i = 1; i < argc-1; i++) {
 		str = argv[i];
-		cout << str << endl;
 
+		//If the string length is <2 we need to check 
 		if (str.length() > 2) {
 			if (str.at(2) == 's' && str.length() > 2) {
 				save=true;
@@ -60,46 +60,53 @@ int main(int argc, char* argv[])
 	}else{
 		rlevel = -1;
 	}
+
+	if (recursive && URL.at(URL.length()-1) == '/') {
+		//Need to exit because the user tried to call -r or --recursive=NUM on 
+		// a single image.
+		cout << "bwm will now exit because -r or --recursive=NUM was specefied without specifying a directory" << endl;
+		exit(1);
+	}
+ 
 	//If the URL is a directory, then see if -r or --recursive=NUM was specefied
 	if (URL.at(URL.length()-1) == '/') {
 		wgetPID = fork();
 		if (wgetPID == 0) {
-		//Need to change this depending on what time of image or folder, need if statement
-		//to see if we have a directory and if its just an image we just need to use the same
-		//switch statement from project 2.
 
 		//use -r and -l # to recursivly download to a certain depth.
 			if (recursive) {
 				execl ("/usr/bin/wget", "wget","-q", "-r","-l",rnum.c_str(), "-P","./temp/","-A", "jpg,tif,png", argv[argc-2], (char*)0); 
 			} else {
-				execl ("/usr/bin/wget", "wget","-q", "-r", "-P","./temp/","-A", "jpg,tif,png", argv[argc-2], (char*)0); 
+				execl ("/usr/bin/wget", "wget", "-q","-r", "-P","./temp/","-A", "jpg,tif,png", argv[argc-2], (char*)0); 
 			}
 		}
 		else {
 			wait(&status);
 		}
 		
-	} else if (recursive) {
-		//Need to exit because the user tried to call -r or --recursive=NUM on 
-		// a single image.
-		cout << "bwm will now exit because -r or --recursive=NUM was specefied without specifying a directory" << endl;
-		exit(0);
 	} else {
-		switch (URL.at(URL.length()-2) ) {
-		case 'p': 
-			cout << "***Image is a jpg" << endl;
-	    		execl ("/usr/bin/wget", "wget", "-q", "-O", "./image.jpg", argv[argc-2], (char*)0); 
-			break;
-		case 'n': 
-			cout << "***Image is a png" << endl;
-			execl ("/usr/bin/wget", "wget", "-q", "-O", "./image.png", argv[argc-2], (char*)0); 
-			break;
-		case 'i': 
-			cout << "***Image is a TIFF" << endl;
-			execl ("/usr/bin/wget", "wget", "-O", "./image.tif", argv[argc-2], (char*)0); 
-			break;
- 		}
-	}
+		//If it is a single image, download it
+		pid_t singleImagePID = fork();
+		if (singleImagePID == 0) {
+			switch (URL.at(URL.length()-2) ) {
+			case 'p': 
+				cout << "***Image is a jpg" << endl;
+		    		execl ("/usr/bin/wget", "wget", "-q","-P","./temp", argv[argc-2], (char*)0); 
+				break;
+			case 'n': 
+				cout << "***Image is a png" << endl;
+				execl ("/usr/bin/wget", "wget", "-q", "-P","./temp", argv[argc-2], (char*)0); 
+				break;
+			case 'i': 
+				cout << "***Image is a TIFF" << endl;
+				execl ("/usr/bin/wget", "wget", "-P","./temp", argv[argc-2], (char*)0); 
+				break;
+			}
+		} else {
+			wait(&status);
+		}
+		
+	} 
 
 	//If -s or --save was specefied, copy the directory so that we save the 
 	if (save) {
@@ -113,44 +120,50 @@ int main(int argc, char* argv[])
 			wait(&status);
 		}
 	}
+
+	//Create the directory stuff for the looping
 	DIR* dir;
 	dir = opendir("./temp/accounts.cs.ou.edu/~phil7017");
-	
+	string URL2;
 	string watermark = argv[argc-1];
-	cout << "**********************Start Loopin****************************" << endl;
-	loop(dir,"./temp/accounts.cs.ou.edu/~phil7017",rlevel,0,watermark);
+	if (URL.at(URL.length()-1) == '/') {
+		cout << "*****************Start Sweeping For Images**********************" << endl;
+		loop(dir,"./temp/accounts.cs.ou.edu/~phil7017",rlevel,0,watermark);
+	} else {
 	//Call wm for a single image
-	wm (argv[argc-2], argv[argc-1]);
+		URL2 = "./temp/" + URL.substr(URL.find_last_of('/'), URL.length()-1);
+		wm (URL2, argv[argc-1]);
+	}
 
+	//Fork off the process to upload the images. 
 	pid_t uploadPID = fork();
 	if (uploadPID == 0) {
-		cout << "Begin Upload" << endl;
-		execl ("/usr/bin/scp", "scp", "-r", "./temp/accounts.cs.ou.edu/~phil7017/images", "phil7017@gpel4.cs.ou.edu :$HOME/public_html/", (char*)0); 
-		cout << "Execed" << endl; 
+		if ( URL.at(URL.length()-1) == '/' ) {
+			cout << "Begin Upload" << endl;
+			execl ("/usr/bin/scp", "scp", "-r", "./temp/accounts.cs.ou.edu/~phil7017/images/", "phil7017@gpel1.cs.ou.edu:~/public_html/", (char*)0); 
+		} else {
+			cout << "Begin Upload" << endl;
+			execl ("/usr/bin/scp", "scp", URL2.c_str(), "phil7017@gpel1.cs.ou.edu:~/public_html/", (char*)0); 
+		}
 	} else {
 		wait(&status);
 	}
-
 	
-/**
+	//Fork off process to remove the temp files.
 	pid_t rmtemp = fork();
 	if (rmtemp == 0) {
-		if ( save ) {
-			cout << "Remove temp files, but save Originals." << endl;
-			execl ("/bin/rm", "rm", "-r", "temp",(char*)0);
-		}
-		else {
-			cout << "Remove all temp files." << endl;
-			execl ("/bin/rm","rm","-r", "temp","Original",(char*)0);
-		}
+		cout << "Remove Temporary Files" << endl;
+		execl ("/bin/rm", "rm", "-r", "temp",(char*)0);
 	}
 	else {
 		wait(&status);
 	}
-**/
-	
 }
 
+/**
+Method that loops through the files recursivly and when an image is found
+ calls the wm method to apply the watermark.
+**/
 int loop(DIR* dir, string name, int max, int current, string watermark){
 	DIR* dent = opendir(name.c_str());	
 	struct dirent* ent;
@@ -165,19 +178,22 @@ int loop(DIR* dir, string name, int max, int current, string watermark){
 		struct stat st;
 		if(stat(filepath.c_str(), &st)) continue;
 		if(S_ISDIR(st.st_mode) && (file.compare(".") != 0 && file.compare("..") != 0)){
-   			cout << "Directory:" << ent->d_name << endl;
 			DIR* cur = opendir(ent->d_name);
 			loop(cur, filepath,max,current++,watermark);
 		}else if(file.compare(".") != 0 && file.compare("..") != 0){
-   			cout << "File:" << ent->d_name << endl;
-			cout << "Pathname:" << filepath << endl;
-			if(filepath.at(filepath.length() - 1) != '/')
+			if(filepath.at(filepath.length() - 1) != '/') {
+				cout << "Watermark image " << filepath << endl;
 				wm(filepath,watermark);
+			}
 		}
 	}
 	return 1;
 }
 
+/**
+Method that takes two string values, one for the pathname to the image and the pathname
+ to the watermark. Applies the watermark and overwrites the original image. 
+**/
 int wm( string file,  string watermark){
 	
 string filePath = file;
@@ -195,7 +211,6 @@ string wmPath = watermark;
 	 if ( childpid2 == 0 )
 	 { 
 		//call the exec in child2 to apply the watermark on the image.
-		cout << "CHILD2: Begin Apply Watermark." << endl;
 		if(filePath.at(filePath.length() - 1) != '/')
   		execl ("/usr/bin/composite", "composite", "-compose","bumpmap", "-tile", wmPath.c_str(),filePath.c_str(), filePath.c_str(), (char*)0);
 	}
